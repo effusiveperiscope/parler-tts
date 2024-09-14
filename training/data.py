@@ -217,6 +217,16 @@ def load_multiple_datasets(
             if sampling_rate is not None and audio_column_name is not None:
                 # resample target audio
                 dataset = dataset.cast_column(audio_column_name, datasets.features.Audio(sampling_rate=sampling_rate))
+                
+                def normalize_audio_fn(example):
+                    audio = example['audio']['array']
+                    max_val = np.max(np.abs(audio))
+                    if max_val > 0:
+                        example['audio']['array'] = audio / max_val
+                    return example
+                
+                # normalize target audio to -1.0, 1.0 (approximately)
+                dataset = dataset.map(normalize_audio_fn)
 
             metadata_dataset_name = dataset_dict["metadata_dataset_name"]
             if metadata_dataset_name is not None:
