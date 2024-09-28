@@ -65,8 +65,17 @@ from training.arguments import ModelArguments, DataTrainingArguments, ParlerTTST
 from training.data import load_multiple_datasets, DataCollatorParlerTTSWithPadding, DataCollatorEncodecWithPadding
 from training.eval import clap_similarity, wer, si_sdr
 
+from training.g2p_classes import HybridPhonemeTokenizer, HorsePhonemizer
+import random
+import numpy as np
+
 logger = logging.getLogger(__name__)
 
+# Try to maintain identical random state across workers
+def seed_worker(worker_id):
+    seed = torch.initial_seed() % 2**32
+    random.seed(seed)
+    np.random.seed(seed)
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -196,14 +205,7 @@ def main():
     sampling_rate = feature_extractor.sampling_rate
 
     # load prompt tokenizer
-    prompt_tokenizer = AutoTokenizer.from_pretrained(
-        model_args.prompt_tokenizer_name or model_args.description_tokenizer_name or model_args.model_name_or_path,
-        cache_dir=model_args.cache_dir,
-        token=data_args.token,
-        trust_remote_code=data_args.trust_remote_code,
-        use_fast=model_args.use_fast_tokenizer,
-        padding_side=model_args.prompt_padding_side,
-    )
+    prompt_tokenizer = HybridPhonemeTokenizer()
 
     # load description tokenizer
     description_tokenizer = AutoTokenizer.from_pretrained(
@@ -218,7 +220,7 @@ def main():
         logger.warning(
             "Disabling fast tokenizer warning: https://github.com/huggingface/transformers/blob/main/src/transformers/tokenization_utils_base.py#L3231-L3235"
         )
-        prompt_tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
+        #prompt_tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
         description_tokenizer.deprecation_warnings["Asking-to-pad-a-fast-tokenizer"] = True
 
     # 2. Now, let's load the dataset
@@ -476,6 +478,7 @@ def main():
                 collate_fn=encoder_data_collator,
                 num_workers=training_args.dataloader_num_workers,
                 pin_memory=True,
+                worker_init_fn=seed_worker,
             )
             data_loader = accelerator.prepare(data_loader)
             total_inference_steps = len(data_loader)
@@ -797,17 +800,20 @@ def main():
     # only the main process saves them
     if accelerator.is_main_process:
         # save feature extractor, tokenizer and config
+        # Can't do this for the hybrid tokenizer since it's not HF tokenizer
         if (
             model_args.prompt_tokenizer_name is None
             and model_args.description_tokenizer_name
             or (model_args.prompt_tokenizer_name == model_args.description_tokenizer_name)
         ):
-            prompt_tokenizer.save_pretrained(training_args.output_dir)
+            #prompt_tokenizer.save_pretrained(training_args.output_dir)
+            pass
         else:
-            logger.warning(
-                f"Prompt tokenizer ('{model_args.prompt_tokenizer_name}') and description tokenizer ('{model_args.description_tokenizer_name}') are not the same. Saving only the prompt tokenizer."
-            )
-            prompt_tokenizer.save_pretrained(training_args.output_dir)
+            #logger.warning(
+            #    f"Prompt tokenizer ('{model_args.prompt_tokenizer_name}') and description tokenizer ('{model_args.description_tokenizer_name}') are not the same. Saving only the prompt tokenizer."
+            #)
+            #prompt_tokenizer.save_pretrained(training_args.output_dir)
+            pass
 
         feature_extractor.save_pretrained(training_args.output_dir)
         config.save_pretrained(training_args.output_dir)
@@ -968,6 +974,7 @@ def main():
             sampler=sampler,
             num_workers=training_args.dataloader_num_workers,
             pin_memory=training_args.dataloader_pin_memory,
+            worker_init_fn=seed_worker,
         )
         train_dataloader = accelerator.prepare(train_dataloader)
         if hasattr(train_dataloader, "dataset") and isinstance(train_dataloader.dataset, IterableDataset):
@@ -1057,6 +1064,7 @@ def main():
                         drop_last=False,
                         num_workers=training_args.eval_dataloader_num_workers,
                         pin_memory=training_args.dataloader_pin_memory,
+                        worker_init_fn=seed_worker,
                     )
                     validation_dataloader = accelerator.prepare(validation_dataloader)
 
@@ -1080,6 +1088,7 @@ def main():
                             drop_last=False,
                             num_workers=training_args.dataloader_pin_memory,
                             pin_memory=training_args.dataloader_pin_memory,
+                            worker_init_fn=seed_worker,
                         )
                         validation_dataloader = accelerator.prepare(validation_dataloader)
                         # generation

@@ -9,7 +9,7 @@ from accelerate import Accelerator
 from datasets import Dataset, IterableDataset, concatenate_datasets, interleave_datasets, load_dataset
 from tqdm import tqdm
 from transformers import AutoFeatureExtractor, AutoTokenizer
-
+from training.g2p_classes import horse_phonemizer, HybridPhonemeTokenizer
 
 @dataclass
 class DataCollatorEncodecWithPadding:
@@ -99,7 +99,30 @@ class DataCollatorParlerTTSWithPadding:
         batch = {"labels": labels, **input_ids}
 
         prompt_input_ids = [{"input_ids": feature["prompt_input_ids"]} for feature in features]
-        prompt_input_ids = self.prompt_tokenizer.pad(
+
+        # HACK. Because at this point the dataset is already preprocessed and I
+        # don't really want to remake it, I'm just decoding the input text
+        # here, randomly applying phonemization, then using those as the
+        # prompt_input_ids.
+
+        # We have to do this before the padding is applied, obviously.
+        # XXX Potential bug - I don't know how well random.shuffle() works if
+        # the collators happen to run on different processes?
+        if type(self.prompt_tokenizer) == HybridPhonemeTokenizer:
+            texts = self.prompt_tokenizer.batch_decode(
+                [d['input_ids'] for d in prompt_input_ids])
+            texts = [horse_phonemizer.random_phonemize(text) for text in texts]
+            prompt_input_ids = [{"input_ids": self.prompt_tokenizer(text)['input_ids']} for text in texts]
+
+        # Obviously this will break the WER evaluation metric, but good
+        # thing you're not supposed to select models based on evaluation metrics
+        # ;^)
+
+        # HACK. Since the description tokenizer and prompt tokenizer
+        # should use the same pad token ID, this is 'OK'
+        # We include an assert to ensure this is the case
+        assert self.prompt_tokenizer.pad_token_id == self.description_tokenizer.pad_token_id
+        prompt_input_ids = self.description_tokenizer.pad(
             prompt_input_ids,
             return_tensors="pt",
             padding=self.padding,
@@ -110,6 +133,8 @@ class DataCollatorParlerTTSWithPadding:
         batch["prompt_input_ids"] = prompt_input_ids["input_ids"]
         if "attention_mask" in prompt_input_ids:
             batch["prompt_attention_mask"] = prompt_input_ids["attention_mask"]
+
+
 
         return batch
 
