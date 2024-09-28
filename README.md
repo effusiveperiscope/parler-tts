@@ -1,7 +1,6 @@
 # g2p branch
-- requires phoneme inputs from `g2p_en` library
-- g2p tokenizer is used instead of T5
-- audio data is automatically normalized
+This replaces the normal prompt tokenizer with a "hybrid phoneme tokenizer" designed to handle both arpabet phonemes and English words. Also it reduces the number of tokens in the tokenizer to prevent undertraining of tokens.
+There have been numerous hacks made to make this work; do not expect consistent behavior with the original repo or command line arguments.
 
 # Parler-TTS
 
