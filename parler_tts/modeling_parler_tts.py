@@ -3500,7 +3500,7 @@ class ParlerTTSForConditionalGeneration(PreTrainedModel):
         output_ids = output_ids[None, ...]
 
         audio_scales = model_kwargs.get("audio_scales")
-        if audio_scales is None:
+        if audio_scales is None or len(audio_scales) != batch_size:
             audio_scales = [None] * batch_size
 
         decode_sequentially = (
