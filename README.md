@@ -1,4 +1,8 @@
-# g2p branch
+# g2p_zs branch
+This pulls from apresence/voice-steering-prep branch for voice steering
+and zero shot voice cloning functionality
+
+## g2p
 This replaces the normal prompt tokenizer with a "hybrid phoneme tokenizer" designed to handle both arpabet phonemes and English words. Also it reduces the number of tokens in the tokenizer to prevent undertraining of tokens.
 There have been numerous hacks made to make this work; do not expect consistent behavior with the original repo or command line arguments.
 
