@@ -313,9 +313,18 @@ def main():
         {
             "cross_attention_implementation_strategy": model_args.cross_attention_implementation_strategy
             if model_args.cross_attention_implementation_strategy is not None
-            else None
+            else None,
+            "rope_embeddings": model_args.use_rope_embeddings 
+            if model_args.use_rope_embeddings is not None
+            else False,
         }
     )
+    if (config.decoder.rope_embeddings):
+        print("============================================================")
+        print("===================="
+            "USING ROPE EMBEDDINGS"
+            "====================")
+        print("============================================================")
     config.update(
         {
             "pad_token_id": model_args.pad_token_id if model_args.pad_token_id is not None else config.pad_token_id,

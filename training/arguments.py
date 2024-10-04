@@ -94,6 +94,11 @@ class ModelArguments:
             "help": "Prompt tokenizer padding side. Defaults to `left`. If the prompt is pre-pended to the codebooks hidden states, it should be padded on the left."
         },
     )
+    use_rope_embeddings: Optional[bool] = field(
+        default=False, metadata={
+            "help": "Enable rope embeddings in place of sinusoidal position encoding."
+        }
+    )
 
 
 @dataclass
