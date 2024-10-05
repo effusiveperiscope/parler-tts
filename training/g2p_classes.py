@@ -19,7 +19,7 @@ def clean_spaces(text):
 # Credit to Synthbot for pruned tokenizers
 class HybridPhonemeTokenizer:
     def __init__(self,
-        tokenizer_eng = 'therealvul/parlertts_tokenizer_clean',
+        tokenizer_eng = 'synthbot/parlertts_tokenizer_clean',
         tokenizer_g2p = 'therealvul/g2pen_tokenizer_clean',
         eng_special = {
             'pad_token': "<pad>",
@@ -73,6 +73,8 @@ class HybridPhonemeTokenizer:
             self.tokenizer_g2p.mask_token_id: self.tokenizer_eng.mask_token_id
         }
         self.pad_token_id = self.tokenizer_eng.pad_token_id
+        self.bos_token_id = self.tokenizer_eng.bos_token_id
+        self.eos_token_id = self.tokenizer_eng.eos_token_id
 
     def ext_is_g2p_id(self, id):
         return id in self.ext_to_g2p
