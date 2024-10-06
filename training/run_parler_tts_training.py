@@ -71,6 +71,25 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# Debugging exception hook
+import sys
+
+def info(type, value, tb):
+    if hasattr(sys, 'ps1') or not sys.stderr.isatty():
+    # we are in interactive mode or we don't have a tty-like
+    # device, so we call the default hook
+        sys.__excepthook__(type, value, tb)
+    else:
+        import traceback, pdb
+        # we are NOT in interactive mode, print the exception...
+        traceback.print_exception(type, value, tb)
+        print
+        # ...then start the debugger in post-mortem mode.
+        # pdb.pm() # deprecated
+        pdb.post_mortem(tb) # more "modern"
+
+sys.excepthook = info
+
 # Try to maintain identical random state across workers
 def seed_worker(worker_id):
     seed = torch.initial_seed() % 2**32
@@ -371,6 +390,30 @@ def main():
 
     # Freeze Encoders
     model.freeze_encoders(model_args.freeze_text_encoder)
+
+    if (training_args.v3_freeze):
+        print("============================================================")
+        print("===================="
+            "PERFORMING V3 WEIGHT FREEZES"
+            "====================")
+        print("============================================================")
+        # Freeze all parameters
+        for param in model.parameters():
+            param.requires_grad = False
+
+        assert type(prompt_tokenizer) is HybridPhonemeTokenizer
+
+        # Unfreeze the prompt embedding here
+        model.embed_prompts.weight.requires_grad = True
+
+        # XXX Not possible to partially freeze an embedding weight by token indices
+        # So, instead we have to manually set the grad inside the training loop to 0
+
+        # Unfreeze encoder_attn layer weights
+        decoder = model.decoder.model.decoder
+        for layer in decoder.layers:
+            for param in layer.encoder_attn.parameters():
+                param.requires_grad = True
 
     # Test all gather - used for warmout and avoiding timeout
     logger.debug(str(accelerator.process_index), main_process_only=False, in_order=True)
@@ -999,7 +1042,17 @@ def main():
         for batch in train_dataloader:
             with accelerator.accumulate(model):
                 loss, train_metric = train_step(batch, accelerator, autocast_kwargs)
+
                 accelerator.backward(loss)
+
+                # XXX
+                # Manually setting embedding grads of existing tokens to 0
+                assert type(prompt_tokenizer) is HybridPhonemeTokenizer
+                for i,wt in enumerate(model.embed_prompts.weight):
+                    if prompt_tokenizer.ext_is_g2p_id(i):
+                        continue
+                    else:
+                        model.embed_prompts.weight.grad[i] = 0 
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(model.parameters(), training_args.max_grad_norm)
                 optimizer.step()
