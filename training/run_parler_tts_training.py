@@ -414,6 +414,8 @@ def main():
         for layer in decoder.layers:
             for param in layer.encoder_attn.parameters():
                 param.requires_grad = True
+            for param in layer.encoder_attn_layer_norm.parameters():
+                param.requires_grad = True
 
     # Test all gather - used for warmout and avoiding timeout
     logger.debug(str(accelerator.process_index), main_process_only=False, in_order=True)
