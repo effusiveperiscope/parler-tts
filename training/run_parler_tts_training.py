@@ -336,11 +336,16 @@ def main():
             "rope_embeddings": model_args.use_rope_embeddings 
             if model_args.use_rope_embeddings is not None
             else False,
+        }
+    )
+    config.update(
+        {
             "hybrid_vocab_size": prompt_tokenizer.max_vocab_length()
             if training_args.v4
             else config.vocab_size
         }
     )
+
     if (config.decoder.rope_embeddings):
         print("============================================================")
         print("===================="
@@ -364,7 +369,7 @@ def main():
         token=data_args.token,
         trust_remote_code=data_args.trust_remote_code,
         attn_implementation=model_args.attn_implementation,
-        strict=False # For loading embed_prompts_new
+        ignore_mismatched_sizes=True
     )
 
     # enable gradient checkpointing if necessary
@@ -1062,8 +1067,9 @@ def main():
                 # Weight decay workaround
                 # Manually resetting embedding weights of old tokens
                 assert type(prompt_tokenizer) is HybridPhonemeTokenizer
-                model.embed_prompts_new.weight[
-                    config.vocab_size:] = cached_embed_weights
+                with torch.no_grad():
+                    model.embed_prompts_new.weight[
+                        :config.vocab_size] = cached_embed_weights[:config.vocab_size]
 
                 lr_scheduler.step()
                 optimizer.zero_grad()

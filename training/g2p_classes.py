@@ -77,7 +77,7 @@ class HybridPhonemeTokenizer:
 
     def max_vocab_length(self):
         return len(
-            self.tokenizer_eng.get_vocab() + self.tokenizer_g2p.get_vocab())
+            self.tokenizer_eng.get_vocab()) + len(self.tokenizer_g2p.get_vocab())
 
     def __call__(self, text):
         text = self.preprocess(text)
