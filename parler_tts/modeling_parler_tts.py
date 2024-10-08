@@ -2284,6 +2284,8 @@ class ParlerTTSForConditionalGeneration(PreTrainedModel):
 
         # prompt embeddings
         self.embed_prompts = nn.Embedding(config.vocab_size, self.decoder.config.hidden_size)
+        self.embed_prompts_new = nn.Embedding(
+            config.hybrid_vocab_size, self.decoder.config.hidden_size)
 
         self.prompt_cross_attention = config.prompt_cross_attention
         if config.prompt_cross_attention:
@@ -2646,7 +2648,7 @@ class ParlerTTSForConditionalGeneration(PreTrainedModel):
 
         if prompt_hidden_states is None:
             if prompt_input_ids is not None:
-                prompt_hidden_states = self.embed_prompts(prompt_input_ids)
+                prompt_hidden_states = self.embed_prompts_new(prompt_input_ids)
 
         if encoder_outputs is None:
             encoder_outputs = self.text_encoder(

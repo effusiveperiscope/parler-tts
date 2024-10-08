@@ -336,6 +336,9 @@ def main():
             "rope_embeddings": model_args.use_rope_embeddings 
             if model_args.use_rope_embeddings is not None
             else False,
+            "hybrid_vocab_size": prompt_tokenizer.max_vocab_length()
+            if training_args.v4
+            else config.vocab_size
         }
     )
     if (config.decoder.rope_embeddings):
@@ -361,6 +364,7 @@ def main():
         token=data_args.token,
         trust_remote_code=data_args.trust_remote_code,
         attn_implementation=model_args.attn_implementation,
+        strict=False # For loading embed_prompts_new
     )
 
     # enable gradient checkpointing if necessary
@@ -391,10 +395,10 @@ def main():
     # Freeze Encoders
     model.freeze_encoders(model_args.freeze_text_encoder)
 
-    if (training_args.v3_freeze):
+    if (training_args.v4):
         print("============================================================")
         print("===================="
-            "PERFORMING V3 WEIGHT FREEZES"
+            "PERFORMING V4 CHANGES"
             "====================")
         print("============================================================")
         # Freeze all parameters
@@ -403,11 +407,15 @@ def main():
 
         assert type(prompt_tokenizer) is HybridPhonemeTokenizer
 
-        # Unfreeze the prompt embedding here
-        model.embed_prompts.weight.requires_grad = True
-
-        # XXX Not possible to partially freeze an embedding weight by token indices
-        # So, instead we have to manually set the grad inside the training loop to 0
+        # Initialize new embedding weights
+        model.embed_prompts_new.weight.data.normal_(0,1)
+        # Transfer the old embedding weights to the new
+        model.embed_prompts_new.weight.data[:config.vocab_size] = model.embed_prompts.weight.data
+        # Unfreeze the new prompt embedding 
+        model.embed_prompts_new.weight.requires_grad = True
+        # Not possible to partially freeze an embedding weight by token indices,
+        # so we cache prompt embedding weights to reset them later
+        cached_embed_weights = model.embed_prompts_new.weight.detach().clone()
 
         # Unfreeze encoder_attn layer weights
         decoder = model.decoder.model.decoder
@@ -1047,17 +1055,16 @@ def main():
 
                 accelerator.backward(loss)
 
-                # XXX
-                # Manually setting embedding grads of existing tokens to 0
-                assert type(prompt_tokenizer) is HybridPhonemeTokenizer
-                for i,wt in enumerate(model.embed_prompts.weight):
-                    if prompt_tokenizer.ext_is_g2p_id(i):
-                        continue
-                    else:
-                        model.embed_prompts.weight.grad[i] = 0 
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(model.parameters(), training_args.max_grad_norm)
                 optimizer.step()
+
+                # Weight decay workaround
+                # Manually resetting embedding weights of old tokens
+                assert type(prompt_tokenizer) is HybridPhonemeTokenizer
+                model.embed_prompts_new.weight[
+                    config.vocab_size:] = cached_embed_weights
+
                 lr_scheduler.step()
                 optimizer.zero_grad()
 

@@ -44,23 +44,7 @@ class HybridPhonemeTokenizer:
         with open(tokenizer_eng_vocab_path, encoding='utf-8') as f:
             tokenizer_eng_scores = json.load(f)["model"]["vocab"]
 
-        # To avoid expanding vocab size and changing embedding length,
-        # we re-map g2p IDs to disabled IDs in the english tokenizer
-
-        # maps from g2p id to external id
-        self.g2p_to_ext = list()
-        # maps from external id to g2p id
-        self.ext_to_g2p = dict()
-        for i,t in enumerate(tokenizer_eng_scores):
-            token, score = t
-            if score == -99.0:
-                self.g2p_to_ext.append(i)
-                self.ext_to_g2p[i] = (len(
-                    self.g2p_to_ext) - 1)
-
-        # The vocab size of the g2p tokenizer must be smaller or equal to
-        # the number of disabled tokens in the eng tokenizer
-        assert len(self.tokenizer_g2p.get_vocab()) < len(self.g2p_to_ext)
+        self.g2p_offset = len(self.tokenizer_eng.get_vocab())
 
         # Not sure if this is actually necessary - ByteLevel pretokenizer
         # removes possibility of <unk> tokens
@@ -77,13 +61,13 @@ class HybridPhonemeTokenizer:
         self.eos_token_id = self.tokenizer_eng.eos_token_id
 
     def ext_is_g2p_id(self, id):
-        return id in self.ext_to_g2p
+        return id >= self.g2p_offset
 
     def ext_to_g2p_id(self, id):
-        return self.ext_to_g2p[id]
+        return id - self.g2p_offset
 
     def g2p_to_ext_id(self, id):
-        return self.g2p_to_ext[id]
+        return id + self.g2p_offset
 
     def preprocess(self, text):
         # Replace multiple spaces with one space
@@ -92,7 +76,8 @@ class HybridPhonemeTokenizer:
         return text
 
     def max_vocab_length(self):
-        return len(self.tokenizer_eng.get_vocab())
+        return len(
+            self.tokenizer_eng.get_vocab() + self.tokenizer_g2p.get_vocab())
 
     def __call__(self, text):
         text = self.preprocess(text)

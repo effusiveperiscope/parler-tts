@@ -365,11 +365,11 @@ class ParlerTTSTrainingArguments(Seq2SeqTrainingArguments):
             )
         },
     )
-    v3_freeze: bool = field(
+    v4: bool = field(
         default=False,
         metadata={
             "help": {
-                "Freezes all weights except g2p associated embeddings and cross attention"
+                "Freezes all weights except g2p associated embeddings and cross attention, and expands embedding"
             }
         }
     )
