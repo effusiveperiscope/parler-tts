@@ -171,3 +171,16 @@ tags
 .ruff_cache
 
 wandb
+audio_code_tmp*
+fixed_tokenizer*
+output_dir*
+test-tokenizer
+tmp_dataset*
+tokenizer_g2p*
+g2pen_corpus_nosep.txt
+horsewords.clean
+hybrid_phoneme*
+*.ipynb
+parler_tokenizer.json
+subscores
+*.wav
