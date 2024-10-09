@@ -2979,7 +2979,7 @@ class ParlerTTSForConditionalGeneration(PreTrainedModel):
         return model_kwargs
 
     def _prepare_prompt_kwargs_for_generation(self, prompt_input_ids, model_kwargs):
-        prompt_hidden_states = self.embed_prompts(prompt_input_ids)
+        prompt_hidden_states = self.embed_prompts_new(prompt_input_ids)
 
         if self.prompt_cross_attention:
             # add sinusoidal positional embedding
