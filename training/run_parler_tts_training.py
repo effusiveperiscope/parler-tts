@@ -405,9 +405,7 @@ def main():
 
         # Unfreeze the prompt embedding here
         model.embed_prompts.weight.requires_grad = True
-
-        # XXX Not possible to partially freeze an embedding weight by token indices
-        # So, instead we have to manually set the grad inside the training loop to 0
+        cached_embed_prompts = model.embed_prompts.weight.detach().clone()
 
         # Unfreeze encoder_attn layer weights
         decoder = model.decoder.model.decoder
@@ -1046,18 +1044,18 @@ def main():
                 loss, train_metric = train_step(batch, accelerator, autocast_kwargs)
 
                 accelerator.backward(loss)
-
+                if accelerator.sync_gradients:
+                    accelerator.clip_grad_norm_(model.parameters(), training_args.max_grad_norm)
+                optimizer.step()
                 # XXX
-                # Manually setting embedding grads of existing tokens to 0
+                # Manually resetting embedding weights of existing tokens 
                 assert type(prompt_tokenizer) is HybridPhonemeTokenizer
                 for i,wt in enumerate(model.embed_prompts.weight):
                     if prompt_tokenizer.ext_is_g2p_id(i):
                         continue
                     else:
-                        model.embed_prompts.weight.grad[i] = 0 
-                if accelerator.sync_gradients:
-                    accelerator.clip_grad_norm_(model.parameters(), training_args.max_grad_norm)
-                optimizer.step()
+                        with torch.no_grad():
+                            model.embed_prompts.weight.data[i] = cached_embed_prompts.data[i]
                 lr_scheduler.step()
                 optimizer.zero_grad()
 
