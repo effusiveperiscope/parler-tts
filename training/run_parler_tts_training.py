@@ -361,6 +361,20 @@ def main():
     # Freeze Encoders
     model.freeze_encoders(model_args.freeze_text_encoder)
 
+    # (original model + original training script, but freeze all weights other than the cross-attention ones).
+    print("========================================"
+        "====================PERFORMING WEIGHT FREEZES===================="
+        "========================================")
+    for param in model.parameters():
+        param.requires_grad = False
+
+        decoder = model.decoder.model.decoder
+        for layer in decoder.layers:
+            for param in layer.encoder_attn.parameters():
+                param.requires_grad = True
+            for param in layer.encoder_attn_layer_norm.parameters():
+                param.requires_grad = True
+
     # Test all gather - used for warmout and avoiding timeout
     logger.debug(str(accelerator.process_index), main_process_only=False, in_order=True)
     test_tensor = torch.tensor([accelerator.process_index], device=accelerator.device)
