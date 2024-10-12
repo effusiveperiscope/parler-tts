@@ -412,8 +412,9 @@ def main():
         for layer in decoder.layers:
             for param in layer.encoder_attn.parameters():
                 param.requires_grad = True
-            for param in layer.encoder_attn_layer_norm.parameters():
-                param.requires_grad = True
+            # One more - maybe DON'T do this?
+            # for param in layer.encoder_attn_layer_norm.parameters():
+                # param.requires_grad = True
 
     # Test all gather - used for warmout and avoiding timeout
     logger.debug(str(accelerator.process_index), main_process_only=False, in_order=True)
@@ -1043,7 +1044,18 @@ def main():
             with accelerator.accumulate(model):
                 loss, train_metric = train_step(batch, accelerator, autocast_kwargs)
 
+
                 accelerator.backward(loss)
+
+                # XXX
+                # Set gradients to 0
+                # (Not sure why, but training messes up horribly when this isn't done)
+                for i,wt in enumerate(model.embed_prompts.weight):
+                    if prompt_tokenizer.ext_is_g2p_id(i):
+                        continue
+                    else:
+                        model.embed_prompts.weight.grad[i] = 0
+
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(model.parameters(), training_args.max_grad_norm)
                 optimizer.step()
