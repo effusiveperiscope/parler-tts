@@ -361,19 +361,19 @@ def main():
     # Freeze Encoders
     model.freeze_encoders(model_args.freeze_text_encoder)
 
-    # (original model + original training script, but freeze all weights other than the cross-attention ones).
-    print("========================================"
-        "====================PERFORMING WEIGHT FREEZES===================="
+    # (original model + original training script, but pseudo-freeze all weights other than the cross-attention ones).
+    print("========================================\n"
+        "====================PERFORMING WEIGHT PSEUDO-FREEZES====================\n"
         "========================================")
-    for param in model.parameters():
-        param.requires_grad = False
-
-        decoder = model.decoder.model.decoder
-        for layer in decoder.layers:
-            for param in layer.encoder_attn.parameters():
-                param.requires_grad = True
-            for param in layer.encoder_attn_layer_norm.parameters():
-                param.requires_grad = True
+    all_parameters = set(model.parameters())
+    trainable_parameters = set()
+    decoder = model.decoder.model.decoder
+    for layer in decoder.layers:
+        for param in layer.encoder_attn.parameters():
+            trainable_parameters.add(param)
+        for param in layer.encoder_attn_layer_norm.parameters():
+            trainable_parameters.add(param)
+    untrained_parameters = all_parameters - trainable_parameters
 
     # Test all gather - used for warmout and avoiding timeout
     logger.debug(str(accelerator.process_index), main_process_only=False, in_order=True)
@@ -735,8 +735,10 @@ def main():
 
     # Define optimizer, LR scheduler, collator
     optimizer = torch.optim.AdamW(
-        params=model.parameters(),
-        lr=training_args.learning_rate,
+        params=[
+            {"params": trainable_parameters, "lr": training_args.learning_rate},
+            {"params": untrained_parameters, "lr": 1e-8}
+        ],
         betas=(training_args.adam_beta1, training_args.adam_beta2),
         eps=training_args.adam_epsilon,
         weight_decay=training_args.weight_decay,
