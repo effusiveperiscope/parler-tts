@@ -374,6 +374,8 @@ def main():
         for param in layer.encoder_attn_layer_norm.parameters():
             trainable_parameters.add(param)
     untrained_parameters = all_parameters - trainable_parameters
+    trainable_parameters = list(trainable_parameters)
+    untrained_parameters = list(untrained_parameters)
 
     # Test all gather - used for warmout and avoiding timeout
     logger.debug(str(accelerator.process_index), main_process_only=False, in_order=True)
