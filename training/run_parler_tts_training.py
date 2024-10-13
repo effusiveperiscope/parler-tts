@@ -738,12 +738,11 @@ def main():
     # Define optimizer, LR scheduler, collator
     optimizer = torch.optim.AdamW(
         params=[
-            {"params": trainable_parameters, "lr": training_args.learning_rate},
-            {"params": untrained_parameters, "lr": 0}
+            {"params": trainable_parameters, "lr": training_args.learning_rate, "weight_decay": training_args.weight_decay},
+            {"params": untrained_parameters, "lr": 0, "weight_decay": 0.0}
         ],
         betas=(training_args.adam_beta1, training_args.adam_beta2),
         eps=training_args.adam_epsilon,
-        weight_decay=training_args.weight_decay,
     )
 
     # LR scheduler gets stepped by `num_processes` each time -> account for this in warmup / total steps
