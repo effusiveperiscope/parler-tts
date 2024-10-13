@@ -739,7 +739,7 @@ def main():
     optimizer = torch.optim.AdamW(
         params=[
             {"params": trainable_parameters, "lr": training_args.learning_rate},
-            {"params": untrained_parameters, "lr": 1e-8}
+            {"params": untrained_parameters, "lr": 0}
         ],
         betas=(training_args.adam_beta1, training_args.adam_beta2),
         eps=training_args.adam_epsilon,
