@@ -15,6 +15,22 @@
 # limitations under the License.
 
 """ Train Parler-TTS using 🤗 Accelerate"""
+import sys
+
+def info(type, value, tb):
+   if hasattr(sys, 'ps1') or not sys.stderr.isatty():
+      # we are in interactive mode or we don't have a tty-like
+      # device, so we call the default hook
+      sys.__excepthook__(type, value, tb)
+   else:
+      import traceback, pdb
+      # we are NOT in interactive mode, print the exception...
+      traceback.print_exception(type, value, tb)
+      print
+      # ...then start the debugger in post-mortem mode.
+      pdb.pm()
+
+sys.excepthook = info
 
 import logging
 import os
@@ -365,19 +381,22 @@ def main():
     print("========================================\n"
         "====================PERFORMING WEIGHT PSEUDO-FREEZES====================\n"
         "========================================")
-    all_parameters = set(model.parameters())
-    trainable_parameters = set()
+    all_parameters = {p: None for p in model.parameters()}
+    trainable_parameters = dict()
     decoder = model.decoder.model.decoder
     for layer in decoder.layers:
         for param in layer.encoder_attn.parameters():
-            trainable_parameters.add(param)
+            trainable_parameters[param] = None
         for param in layer.encoder_attn_layer_norm.parameters():
-            trainable_parameters.add(param)
-    untrained_parameters = all_parameters - trainable_parameters
-    trainable_parameters = list(trainable_parameters)
-    untrained_parameters = list(untrained_parameters)
+            trainable_parameters[param] = None
+    untrained_parameters = dict()
+    for param in all_parameters.keys():
+        if param not in trainable_parameters:
+            untrained_parameters[param] = None
+    trainable_parameters = list(trainable_parameters.keys())
+    untrained_parameters = list(untrained_parameters.keys())
 
-    # Test all gather - used for warmout and avoiding timeout
+    # Test all gather - used for warmout and avoiding timeou
     logger.debug(str(accelerator.process_index), main_process_only=False, in_order=True)
     test_tensor = torch.tensor([accelerator.process_index], device=accelerator.device)
     gathered_tensor = accelerator.gather(test_tensor)
