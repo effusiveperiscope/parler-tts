@@ -377,17 +377,18 @@ def main():
     # Freeze Encoders
     model.freeze_encoders(model_args.freeze_text_encoder)
 
-    # (original model + original training script, but pseudo-freeze all weights other than the cross-attention ones).
-    print("========================================\n"
-        "====================PERFORMING WEIGHT PSEUDO-FREEZES====================\n"
-        "========================================")
+    # (original model + original training script).
+    print("============================================================\n"
+        "====================TRAIN ONLY UPPER LAYERS===================="
+        "============================================================")
     all_parameters = {p: None for p in model.parameters()}
     trainable_parameters = dict()
     decoder = model.decoder.model.decoder
-    for layer in decoder.layers:
-        for param in layer.encoder_attn.parameters():
-            trainable_parameters[param] = None
-        for param in layer.encoder_attn_layer_norm.parameters():
+    num_layers = len(decoder.layers)
+    unfreeze_count = num_layers // 3 # unfreeze top third of layers
+    print(f"Unfreezing top {unfreeze_count} decoder layers")
+    for layer in decoder.layers[num_layers - unfreeze_count:]:
+        for param in layer.parameters():
             trainable_parameters[param] = None
     untrained_parameters = dict()
     for param in all_parameters.keys():
